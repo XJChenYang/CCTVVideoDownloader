@@ -27,6 +27,18 @@
 1. **获取可执行文件**：直接使用 `artifacts/CCTVVideoDownloader-x64-Release` 中的打包目录（或自行编译后运行 `bin/Release/CCTVVideoDownloader.exe`）。
 2. **运行程序**：双击可执行文件启动，界面会自动加载频道与栏目列表。
 
+### 源码快速运行（git clone 后直接启动）
+
+1. 准备环境：安装 **MSVC 2022**、**Qt 6.8.0 msvc2022_64**，并确保通过 **vcpkg** 安装 `cpr/libcurl/OpenSSL`（`vcpkg install cpr curl[openssl] openssl --triplet x64-windows`，建议执行 `vcpkg integrate install`）。
+2. 克隆仓库：`git clone https://github.com/letr007/CCTVVideoDownloader.git && cd CCTVVideoDownloader`。
+3. 一键构建并启动：
+   ```powershell
+   # 将 Qt/vcpkg 路径换成你的本地路径，默认 Debug 配置；如需 Release 可添加 -Configuration Release
+   powershell -ExecutionPolicy Bypass -File scripts/run-local.ps1 \ \
+       -QtInstallRoot "C:\\Qt\\6.8.0\\msvc2022_64" -VcpkgRoot "C:\\vcpkg"
+   ```
+   脚本会自动调用 `msbuild` 生成二进制并在同一终端中启动应用；若已在 VS 中编译过，可带上 `-SkipBuild` 仅启动。
+
 ## :clapper:使用步骤
 
 1. **选择栏目**：左侧列表点击一个栏目，右侧会刷新该栏目的视频列表。
