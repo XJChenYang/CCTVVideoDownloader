@@ -28,7 +28,7 @@ void DownloadEngine::download(const QString& url, const QString& saveDir, const 
         return;
     }
 
-    auto* task = new DownloadTask(url, saveDir, userData);
+    auto* task = new DownloadTask(url, saveDir, userData, m_resumeExisting);
     task->setAutoDelete(false);
 
     connect(task, &DownloadTask::progressChanged, this, &DownloadEngine::onDownloadProgress, Qt::QueuedConnection);

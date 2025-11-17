@@ -5,6 +5,7 @@
 #include <QEventLoop>
 #include <QFile>
 #include <QDir>
+#include <QFileInfo>
 #include <QUrl>
 #include <QDateTime>
 #include <QDebug>
@@ -19,13 +20,22 @@ static QString extractFilenameFromUrlImpl(const QString& url) {
     return filename;
 }
 
-DownloadTask::DownloadTask(const QString& url, const QString& saveDir, const QVariant& userData)
+DownloadTask::DownloadTask(const QString& url, const QString& saveDir, const QVariant& userData, bool resumeExisting)
     : QObject(nullptr), QRunnable(),
-    m_url(url), m_saveDir(saveDir), m_userData(userData), m_cancelled(false)
+    m_url(url), m_saveDir(saveDir), m_userData(userData), m_resumeExisting(resumeExisting), m_cancelled(false)
 {
     QString filename = extractFilenameFromUrlImpl(url);
     m_filePath = QDir(m_saveDir).filePath(filename);
     QDir().mkpath(m_saveDir);
+
+    if (m_resumeExisting)
+    {
+        QFileInfo info(m_filePath);
+        if (info.exists())
+        {
+            m_existingSize = info.size();
+        }
+    }
 }
 
 DownloadTask::~DownloadTask()
@@ -40,6 +50,13 @@ void DownloadTask::run()
     }
 
     QFile file(m_filePath);
+    if (m_resumeExisting && m_existingSize > 0)
+    {
+        emit progressChanged(m_existingSize, m_existingSize, m_userData);
+        emit downloadFinished(true, m_filePath, m_userData);
+        return;
+    }
+
     if (!file.open(QIODevice::WriteOnly)) {
         emit downloadFinished(false, "Cannot open file", m_userData);
         return;
@@ -51,7 +68,7 @@ void DownloadTask::run()
     QNetworkReply* reply = manager.get(request);
 
     QObject::connect(reply, &QNetworkReply::downloadProgress, [&](qint64 rec, qint64 total) {
-        emit progressChanged(rec, total, m_userData);
+        emit progressChanged(rec + m_existingSize, total + m_existingSize, m_userData);
         });
 
     QObject::connect(reply, &QNetworkReply::readyRead, [&]() {

@@ -1,14 +1,16 @@
 ﻿#include "../head/downloaddialog.h"
 #include <QMessageBox>
 #include <QCloseEvent>
+#include <QtGlobal>
 
 Download::Download(QWidget* parent)
 	: QDialog(parent)
 {
 	ui.setupUi(this);
-	m_model = new DownloadModel(this);
-	m_engine = new DownloadEngine(this);
-	ui.tableView->setModel(m_model);
+        m_model = new DownloadModel(this);
+        m_engine = new DownloadEngine(this);
+        m_engine->setResumeExisting(true);
+        ui.tableView->setModel(m_model);
 	// 设置列宽策略
 	ui.tableView->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 	ui.tableView->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
@@ -67,17 +69,21 @@ void Download::transferDwonloadParams(
 }
 
 void Download::onDownloadProgress(
-	qint64 bytesReceived,
-	qint64 bytesTotal,
-	const QVariant& userData
+        qint64 bytesReceived,
+        qint64 bytesTotal,
+        const QVariant& userData
 )
 {
-	double progress = 100 * (bytesReceived / bytesTotal);
-	auto index = userData.toInt();
-	if (m_infoList.contains(index))
-	{
-		auto info = m_infoList[index];
-		info.progress = static_cast<int>(progress);
+        double progress = 0;
+        if (bytesTotal > 0)
+        {
+                progress = static_cast<double>(bytesReceived) / static_cast<double>(bytesTotal) * 100.0;
+        }
+        auto index = userData.toInt();
+        if (m_infoList.contains(index))
+        {
+                auto info = m_infoList[index];
+                info.progress = qBound(0, static_cast<int>(progress + 0.5), 100);
 		if (progress >= 100)
 		{
 			info.status = DownloadStatus::Finished;
@@ -94,12 +100,13 @@ void Download::onDownloadProgress(
 
 void Download::stratDownload()
 {
-	for (const auto& info : m_infoList)
-	{
-		m_engine->download(info.url, m_savePath, info.index);
-	}
-	connect(m_engine, &DownloadEngine::downloadProgress, this, &Download::onDownloadProgress);
-	connect(m_engine, &DownloadEngine::allDownloadFinished, this, &Download::onAllDownloadFinished);
+        for (const auto& info : m_infoList)
+        {
+                m_engine->download(info.url, m_savePath, info.index);
+        }
+        connect(m_engine, &DownloadEngine::downloadProgress, this, &Download::onDownloadProgress);
+        connect(m_engine, &DownloadEngine::downloadFinished, this, &Download::onDownloadFinished);
+        connect(m_engine, &DownloadEngine::allDownloadFinished, this, &Download::onAllDownloadFinished);
 }
 
 void Download::closeEvent(QCloseEvent *event)
