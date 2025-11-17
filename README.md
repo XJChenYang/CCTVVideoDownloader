@@ -24,8 +24,19 @@
 
 ## :zap:使用方法
 
-运行程序，从节目列表中选择一个栏目，点击后会自动刷新视频列表，选择一个视频后， 
+运行程序，从节目列表中选择一个栏目，点击后会自动刷新视频列表，选择一个视频后，
 将在右侧得到此节目的详细信息，然后您可以进行相关操作。
+
+## :package:构建与打包
+
+1. 准备环境：安装 **MSVC 2022**、**Qt 6.8.0 msvc2022_64**，并通过 **vcpkg** 提供 `cpr/libcurl/OpenSSL` 依赖（设置好 `VCPKG_ROOT`）。
+2. 在 *x64 Native Tools Command Prompt* 中验证代码可编译与测试：
+   - `msbuild CCTVVideoDownloader.vcxproj /p:Configuration=Release /p:Platform=x64`
+   - `msbuild test/test.vcxproj /p:Configuration=Release /p:Platform=x64`
+   - 使用 `vstest.console.exe test/x64/Release/test.dll --parallel` 运行测试（若已安装测试组件）。
+3. 打包成可运行目录：
+   - `powershell -ExecutionPolicy Bypass -File scripts/package-windows.ps1 -QtInstallRoot "C:\\Qt\\6.8.0\\msvc2022_64" -VcpkgRoot "C:\\vcpkg"`
+   - 脚本会在 `artifacts/CCTVVideoDownloader-x64-Release` 生成包含可执行文件、Qt 运行库、vcpkg DLL 及 `decrypt` 数据的发布目录。
 
 ## :pencil:配置设置
 
