@@ -8,7 +8,7 @@ class DownloadTask : public QObject, public QRunnable
 {
     Q_OBJECT
 public:
-    DownloadTask(const QString& url, const QString& saveDir, const QVariant& userData);
+    DownloadTask(const QString& url, const QString& saveDir, const QVariant& userData, bool resumeExisting = true);
     ~DownloadTask();
 
     void run() override;
@@ -24,5 +24,7 @@ private:
     QString m_saveDir;
     QString m_filePath;
     QVariant m_userData;
+    bool m_resumeExisting;
+    qint64 m_existingSize = 0;
     bool m_cancelled;
 };

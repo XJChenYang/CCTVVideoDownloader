@@ -24,6 +24,7 @@ void DownloadModel::updateInfo(const DownloadInfo& info) {
         switch (info.status) {
         case DownloadStatus::Downloading: return QBrush(Qt::blue);
         case DownloadStatus::Finished: return QBrush(Qt::darkGreen);
+        case DownloadStatus::Waiting: return QBrush(Qt::gray);
         default: return QBrush(Qt::white);
         }
         }());

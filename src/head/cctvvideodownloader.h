@@ -11,6 +11,7 @@
 #include <QRegularExpression>
 #include <QDesktopServices>
 #include <QMessageBox>
+#include <QList>
 
 class CCTVVideoDownloader : public QMainWindow
 {
@@ -43,6 +44,10 @@ public:
 
     void decryptVideo();
 
+    void startNextQueuedDownload();
+
+    void onSingleDownloadFlowFinished();
+
     void ImportProgrammeFromUrl();
 
 private:
@@ -50,4 +55,6 @@ private:
     inline static std::optional<std::tuple<QString, QString>> SELECTED_ID;
     inline static std::optional<std::tuple<QString, QString>> DOWNLOAD_META_INFO;
     inline static QMap<int, VideoItem> VIDEOS;
+    QList<std::tuple<QString, QString>> m_downloadQueue;
+    bool m_isBatchDownloading = false;
 };

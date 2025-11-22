@@ -21,6 +21,7 @@ public:
     int activeDownloads() const;
     int maxThreadCount() const;
     void setMaxThreadCount(int count);
+    void setResumeExisting(bool enabled) { m_resumeExisting = enabled; }
 
     void waitForAllFinished();
 
@@ -36,5 +37,6 @@ private slots:
 private:
     QThreadPool m_threadPool;
     QHash<QVariant, DownloadTask*> m_activeDownloads;
+    bool m_resumeExisting = true;
     mutable QMutex m_mutex;
 };

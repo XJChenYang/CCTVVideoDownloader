@@ -6,6 +6,7 @@
 #include "../head/concat.h"
 #include "../head/decrypt.h"
 #include "../head/apiservice.h"
+#include <QAbstractItemView>
 
 //std::tuple<int, int> CCTVVideoDownloader::SELECTED_ID;
 
@@ -16,6 +17,10 @@ CCTVVideoDownloader::CCTVVideoDownloader(QWidget *parent)
     // 设置标题和图标
     setWindowTitle(QString("央视视频下载器"));
     setWindowIcon(QIcon(QPixmap(":/cctvvideodownload.png")));
+    ui.tableWidget_List->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    ui.tableWidget_List->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui.tableWidget_List->setAlternatingRowColors(true);
+    ui.tableWidget_Config->setAlternatingRowColors(true);
     signalConnect();
     initGlobalSettings();
     flashProgrammeList();
@@ -91,6 +96,7 @@ void CCTVVideoDownloader::flashVideoList()
     ui.tableWidget_List->clearContents();
     ui.tableWidget_List->setRowCount(VIDEOS.size());
     ui.tableWidget_List->setColumnWidth(0, 300);
+    ui.tableWidget_List->horizontalHeader()->setStretchLastSection(true);
 
     int row = 0;
     for (auto&& [index, item] : std::as_const(VIDEOS).asKeyValueRange()) {
@@ -193,28 +199,32 @@ void CCTVVideoDownloader::openImportDialog()
 
 void CCTVVideoDownloader::openDownloadDialog()
 {
-    if (!DOWNLOAD_META_INFO.has_value()) {
+    QList<std::tuple<QString, QString>> selectedVideos;
+    const auto selectedRows = ui.tableWidget_List->selectionModel()->selectedRows();
+    for (const auto& modelIndex : selectedRows)
+    {
+        const auto row = modelIndex.row();
+        auto it = VIDEOS.find(row);
+        if (it != VIDEOS.end())
+        {
+            selectedVideos.append({ it->title, it->guid });
+        }
+    }
+
+    if (selectedVideos.isEmpty() && DOWNLOAD_META_INFO.has_value())
+    {
+        selectedVideos.append(*DOWNLOAD_META_INFO);
+    }
+
+    if (selectedVideos.isEmpty())
+    {
         QMessageBox::warning(this, "Warning", "请先选择要下载的视频！");
         return;
     }
-    auto [title, GUID] = *DOWNLOAD_META_INFO;
-    QString savePath = readSavePath();
-    int threadNum = readThreadNum();
-    QStringList URLS = APIService::instance().getEncryptM3U8Urls(
-        GUID,
-        readQuality()
-    );
-    //qDebug() << URLS;
 
-    Download dialog(this);
-    // 先关闭下载窗口再进行完成后操作
-    connect(&dialog, &Download::DownloadFinished, this, [this, &dialog]() {
-        dialog.accept();
-        concatVideo();
-        });
-    dialog.transferDwonloadParams(title, URLS, savePath, threadNum);
-    dialog.setModal(true);
-    dialog.exec();
+    m_downloadQueue = selectedVideos;
+    m_isBatchDownloading = m_downloadQueue.size() > 1;
+    startNextQueuedDownload();
 }
 
 void CCTVVideoDownloader::concatVideo()
@@ -232,6 +242,64 @@ void CCTVVideoDownloader::decryptVideo()
     auto [title, GUID] = *DOWNLOAD_META_INFO;
     QString savePath = readSavePath();
     Decrypt decryptDialog(this);
+    bool advancedQueue = false;
+    connect(&decryptDialog, &Decrypt::DecryptFinished, this, [this, &advancedQueue]() {
+        advancedQueue = true;
+        onSingleDownloadFlowFinished();
+        });
     decryptDialog.transferDecryptParams(title, savePath);
     decryptDialog.exec();
+    // 如果没有触发成功信号（例如失败或取消），仍然推进队列
+    if (!advancedQueue && !m_downloadQueue.isEmpty())
+    {
+        onSingleDownloadFlowFinished();
+    }
+}
+
+void CCTVVideoDownloader::startNextQueuedDownload()
+{
+    if (m_downloadQueue.isEmpty())
+    {
+        statusBar()->showMessage(QStringLiteral("所有下载任务完成"), 5000);
+        m_isBatchDownloading = false;
+        return;
+    }
+
+    auto [title, GUID] = m_downloadQueue.front();
+    DOWNLOAD_META_INFO.emplace(title, GUID);
+
+    QString savePath = readSavePath();
+    int threadNum = readThreadNum();
+    QStringList URLS = APIService::instance().getEncryptM3U8Urls(
+        GUID,
+        readQuality()
+    );
+
+    if (URLS.isEmpty())
+    {
+        QMessageBox::warning(this, "Error", QStringLiteral("%1 的下载地址为空").arg(title));
+        m_downloadQueue.pop_front();
+        startNextQueuedDownload();
+        return;
+    }
+
+    Download dialog(this);
+    // 先关闭下载窗口再进行完成后操作
+    connect(&dialog, &Download::DownloadFinished, this, [this, &dialog]() {
+        dialog.accept();
+        concatVideo();
+        });
+    dialog.transferDwonloadParams(title, URLS, savePath, threadNum);
+    dialog.setModal(true);
+    statusBar()->showMessage(QStringLiteral("正在下载：%1（剩余%2个任务）").arg(title).arg(m_downloadQueue.size() - 1));
+    dialog.exec();
+}
+
+void CCTVVideoDownloader::onSingleDownloadFlowFinished()
+{
+    if (!m_downloadQueue.isEmpty())
+    {
+        m_downloadQueue.pop_front();
+    }
+    startNextQueuedDownload();
 }
